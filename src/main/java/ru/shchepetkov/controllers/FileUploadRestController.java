@@ -43,15 +43,34 @@ public class FileUploadRestController {
                 return ResponseEntity.badRequest().body(response);
             }
 
+            // Проверяем тип файла
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                response.put("success", false);
+                response.put("message", "Only image files are allowed");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            // Проверяем размер файла (максимум 5MB)
+            if (file.getSize() > 5 * 1024 * 1024) {
+                response.put("success", false);
+                response.put("message", "File size exceeds 5MB limit");
+                return ResponseEntity.badRequest().body(response);
+            }
+
             // Создаем директорию если не существует
             File uploadDir = new File(uploadPath);
             if (!uploadDir.exists()) {
                 uploadDir.mkdirs();
             }
 
-            // Генерируем уникальное имя файла
+            // Генерируем уникальное имя файла с правильным расширением
             String uuidFile = UUID.randomUUID().toString();
-            String resultFilename = uuidFile + "." + file.getOriginalFilename();
+            String originalFilename = file.getOriginalFilename();
+            String extension = originalFilename != null && originalFilename.contains(".") 
+                ? originalFilename.substring(originalFilename.lastIndexOf(".")) 
+                : ".jpg";
+            String resultFilename = uuidFile + extension;
 
             // Сохраняем файл
             Path path = Paths.get(uploadPath, resultFilename);

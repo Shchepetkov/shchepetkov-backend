@@ -1,6 +1,7 @@
 package ru.shchepetkov.controllers;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -14,9 +15,12 @@ import ru.shchepetkov.dto.LoginResponse;
 import ru.shchepetkov.dto.UserDto;
 import ru.shchepetkov.security.JwtTokenProvider;
 
+import javax.validation.Valid;
+
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -37,13 +41,15 @@ public class AuthRestController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        log.info("Login attempt for user: {}", request.getUsername());
         LoginResponse response = new LoginResponse();
         
         try {
             // Проверяем, что пользователь существует и активен
             User user = userService.findByUsernameOrThrow(request.getUsername());
             if (!user.isActive()) {
+                log.warn("Login attempt for deactivated user: {}", request.getUsername());
                 response.setSuccess(false);
                 response.setMessage("Account is deactivated");
                 return ResponseEntity.badRequest().body(response);
@@ -65,8 +71,10 @@ public class AuthRestController {
             response.setUser(toDto(user));
             response.setToken("Bearer " + jwtToken);
             
+            log.info("Successful login for user: {}", request.getUsername());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            log.warn("Failed login attempt for user: {}, error: {}", request.getUsername(), e.getMessage());
             response.setSuccess(false);
             response.setMessage("Invalid username or password");
             return ResponseEntity.badRequest().body(response);
