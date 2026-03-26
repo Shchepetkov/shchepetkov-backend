@@ -11,7 +11,10 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.context.request.ServletWebRequest;
+import org.springframework.web.context.request.WebRequest;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -19,82 +22,89 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private ResponseEntity<ApiErrorResponse> buildErrorResponse(
+            HttpStatus status,
+            String code,
+            String message,
+            WebRequest request,
+            Map<String, String> details
+    ) {
+        String path = request instanceof ServletWebRequest
+                ? ((ServletWebRequest) request).getRequest().getRequestURI()
+                : "";
+
+        ApiErrorResponse body = ApiErrorResponse.builder()
+                .timestamp(Instant.now())
+                .status(status.value())
+                .error(status.getReasonPhrase())
+                .code(code)
+                .message(message)
+                .path(path)
+                .details(details)
+                .build();
+
+        return ResponseEntity.status(status).body(body);
+    }
+
     @ExceptionHandler(UsernameNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleUsernameNotFound(UsernameNotFoundException ex) {
+    public ResponseEntity<ApiErrorResponse> handleUsernameNotFound(UsernameNotFoundException ex, WebRequest request) {
         log.warn("User not found: {}", ex.getMessage());
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("message", "User not found");
-        response.put("error", "USER_NOT_FOUND");
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        return buildErrorResponse(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found", request, null);
     }
 
     @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<Map<String, Object>> handleBadCredentials(BadCredentialsException ex) {
+    public ResponseEntity<ApiErrorResponse> handleBadCredentials(BadCredentialsException ex, WebRequest request) {
         log.warn("Bad credentials: {}", ex.getMessage());
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("message", "Invalid username or password");
-        response.put("error", "BAD_CREDENTIALS");
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        return buildErrorResponse(HttpStatus.UNAUTHORIZED, "BAD_CREDENTIALS", "Invalid username or password", request, null);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
+    public ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException ex, WebRequest request) {
         log.warn("Access denied: {}", ex.getMessage());
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("message", "Access denied");
-        response.put("error", "ACCESS_DENIED");
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        return buildErrorResponse(HttpStatus.FORBIDDEN, "ACCESS_DENIED", "Access denied", request, null);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidationExceptions(MethodArgumentNotValidException ex) {
+    public ResponseEntity<ApiErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex, WebRequest request) {
         log.warn("Validation error: {}", ex.getMessage());
-        Map<String, Object> response = new HashMap<>();
         Map<String, String> errors = new HashMap<>();
-        
+
         ex.getBindingResult().getAllErrors().forEach((error) -> {
             String fieldName = ((FieldError) error).getField();
             String errorMessage = error.getDefaultMessage();
             errors.put(fieldName, errorMessage);
         });
-        
-        response.put("success", false);
-        response.put("message", "Validation failed");
-        response.put("errors", errors);
-        response.put("error", "VALIDATION_ERROR");
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Validation failed", request, errors);
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<Map<String, Object>> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex) {
+    public ResponseEntity<ApiErrorResponse> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex, WebRequest request) {
         log.warn("File too large: {}", ex.getMessage());
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("message", "File size exceeds maximum allowed size");
-        response.put("error", "FILE_TOO_LARGE");
-        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(response);
+        return buildErrorResponse(
+                HttpStatus.PAYLOAD_TOO_LARGE,
+                "FILE_TOO_LARGE",
+                "File size exceeds maximum allowed size",
+                request,
+                null
+        );
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
+    public ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException ex, WebRequest request) {
         log.warn("Illegal argument: {}", ex.getMessage());
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("message", ex.getMessage());
-        response.put("error", "ILLEGAL_ARGUMENT");
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "ILLEGAL_ARGUMENT", ex.getMessage(), request, null);
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
+    public ResponseEntity<ApiErrorResponse> handleGenericException(Exception ex, WebRequest request) {
         log.error("Unexpected error: ", ex);
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("message", "An unexpected error occurred");
-        response.put("error", "INTERNAL_SERVER_ERROR");
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        return buildErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "INTERNAL_SERVER_ERROR",
+                "An unexpected error occurred",
+                request,
+                null
+        );
     }
 }

@@ -16,7 +16,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/home")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class HomeRestController {
 
     private final MessageService messageService;

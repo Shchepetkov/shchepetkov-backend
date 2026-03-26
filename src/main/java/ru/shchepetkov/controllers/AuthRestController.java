@@ -24,7 +24,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class AuthRestController {
 
     private final UserService userService;
@@ -37,6 +36,12 @@ public class AuthRestController {
         dto.setUsername(user.getUsername());
         dto.setActive(user.isActive());
         dto.setAvatarPath(user.getAvatarPath());
+        dto.setFullName(user.getFullName());
+        dto.setEmail(user.getEmail());
+        dto.setLocation(user.getLocation());
+        dto.setBio(user.getBio());
+        dto.setCreatedAt(user.getCreatedAt());
+        dto.setUpdatedAt(user.getUpdatedAt());
         return dto;
     }
 

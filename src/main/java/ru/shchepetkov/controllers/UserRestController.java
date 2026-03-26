@@ -3,7 +3,9 @@ package ru.shchepetkov.controllers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import ru.shchepetkov.dto.UpdateProfileRequest;
 import ru.shchepetkov.models.User;
 import ru.shchepetkov.service.UserService;
 import ru.shchepetkov.dto.UserDto;
@@ -17,7 +19,6 @@ import java.util.HashMap;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class UserRestController {
 
     private final UserService userService;
@@ -28,7 +29,29 @@ public class UserRestController {
         dto.setUsername(user.getUsername());
         dto.setActive(user.isActive());
         dto.setAvatarPath(user.getAvatarPath());
+        dto.setFullName(user.getFullName());
+        dto.setEmail(user.getEmail());
+        dto.setLocation(user.getLocation());
+        dto.setBio(user.getBio());
+        dto.setCreatedAt(user.getCreatedAt());
+        dto.setUpdatedAt(user.getUpdatedAt());
         return dto;
+    }
+
+    @GetMapping("/me/profile")
+    public ResponseEntity<UserDto> getMyProfile(Authentication authentication) {
+        User user = userService.findByUsernameOrThrow(authentication.getName());
+        return ResponseEntity.ok(toDto(user));
+    }
+
+    @PutMapping("/me/profile")
+    public ResponseEntity<UserDto> updateMyProfile(
+            Authentication authentication,
+            @RequestBody UpdateProfileRequest request
+    ) {
+        User currentUser = userService.findByUsernameOrThrow(authentication.getName());
+        User updatedUser = userService.updateProfileDetails(currentUser, request);
+        return ResponseEntity.ok(toDto(updatedUser));
     }
 
     @GetMapping

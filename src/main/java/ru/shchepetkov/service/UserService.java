@@ -6,6 +6,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+import ru.shchepetkov.dto.UpdateProfileRequest;
 import ru.shchepetkov.models.Role;
 import ru.shchepetkov.models.User;
 import ru.shchepetkov.repository.UserRepository;
@@ -21,10 +23,15 @@ public class UserService implements UserDetailsService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
+    private String normalizeUsername(String username) {
+        return username == null ? "" : username.trim();
+    }
+
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        return userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+        String normalizedUsername = normalizeUsername(username);
+        return userRepository.findByUsernameIgnoreCase(normalizedUsername)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + normalizedUsername));
     }
 
     public List<User> findAll() {
@@ -32,10 +39,11 @@ public class UserService implements UserDetailsService {
     }
 
     public Optional<User> findByUsername(String username) {
+        String normalizedUsername = normalizeUsername(username);
         try {
-            return userRepository.findByUsername(username);
+            return userRepository.findByUsernameIgnoreCase(normalizedUsername);
         } catch (Exception e) {
-            throw new UsernameNotFoundException("Error finding user: " + username, e);
+            throw new UsernameNotFoundException("Error finding user: " + normalizedUsername, e);
         }
     }
 
@@ -62,7 +70,10 @@ public class UserService implements UserDetailsService {
     }
 
     public boolean addUser(User user) {
-        if (userRepository.existsByUsername(user.getUsername())) {
+        String normalizedUsername = normalizeUsername(user.getUsername());
+        user.setUsername(normalizedUsername);
+
+        if (userRepository.existsByUsernameIgnoreCase(normalizedUsername)) {
             return false;
         }
         user.setActive(true);
@@ -73,7 +84,10 @@ public class UserService implements UserDetailsService {
     }
 
     public boolean saveUser(User user) {
-        if (userRepository.existsByUsername(user.getUsername())) {
+        String normalizedUsername = normalizeUsername(user.getUsername());
+        user.setUsername(normalizedUsername);
+
+        if (userRepository.existsByUsernameIgnoreCase(normalizedUsername)) {
             return false;
         }
         user.setActive(true);
@@ -84,20 +98,22 @@ public class UserService implements UserDetailsService {
     }
 
     public boolean existsByUsername(String username) {
-        return userRepository.existsByUsername(username);
+        return userRepository.existsByUsernameIgnoreCase(normalizeUsername(username));
     }
 
     public User findByUsernameOrThrow(String username) {
-        return userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+        String normalizedUsername = normalizeUsername(username);
+        return userRepository.findByUsernameIgnoreCase(normalizedUsername)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + normalizedUsername));
     }
 
     public void updateProfile(User user, String username, String password) {
-        if (username != null && !username.isEmpty() && !username.equals(user.getUsername())) {
-            if (userRepository.existsByUsername(username)) {
-                throw new RuntimeException("Username already exists: " + username);
+        String normalizedUsername = normalizeUsername(username);
+        if (!normalizedUsername.isEmpty() && !normalizedUsername.equalsIgnoreCase(user.getUsername())) {
+            if (userRepository.existsByUsernameIgnoreCase(normalizedUsername)) {
+                throw new RuntimeException("Username already exists: " + normalizedUsername);
             }
-            user.setUsername(username);
+            user.setUsername(normalizedUsername);
         }
         
         if (password != null && !password.isEmpty()) {
@@ -129,5 +145,20 @@ public class UserService implements UserDetailsService {
             user.setActive(true);
             userRepository.save(user);
         }
+    }
+
+    public User updateProfileDetails(User user, UpdateProfileRequest request) {
+        user.setFullName(normalizeNullableValue(request.getFullName()));
+        user.setEmail(normalizeNullableValue(request.getEmail()));
+        user.setLocation(normalizeNullableValue(request.getLocation()));
+        user.setBio(normalizeNullableValue(request.getBio()));
+        return userRepository.save(user);
+    }
+
+    private String normalizeNullableValue(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        return value.trim();
     }
 } 
